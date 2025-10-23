@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.CodexiaBeta" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <style name="Theme.CodexiaBeta.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/arcane_indigo</item>
+
+        <!-- This now points to our new inset drawable. The system will crop the
+             transparent padding, not your logo. -->
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_logo_inset</item>
+
+        <item name="postSplashScreenTheme">@style/Theme.CodexiaBeta</item>
+    </style>
+
+</resources>
