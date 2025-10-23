@@ -44,7 +44,7 @@ The app is completely **offline-first** and focuses on **user control**, **manua
 
 ---
 
-## 🧠 Technical Stack
+## Technical Stack
 
 | Layer | Technology |
 |-------|-------------|
@@ -59,7 +59,7 @@ The app is completely **offline-first** and focuses on **user control**, **manua
 
 ---
 
-## 🗃️ Database Schema
+## Database Schema
 
 | Table | Fields |
 |--------|---------|
@@ -71,7 +71,7 @@ The app is completely **offline-first** and focuses on **user control**, **manua
 
 ---
 
-## 🚀 Setup & Installation
+## Setup & Installation
 
 ### Prerequisites
 - Android Studio (latest stable)
