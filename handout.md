@@ -84,10 +84,8 @@ com.example.codexiabeta
 ---
 
 ## 🔮 Roadmap (Upcoming)
-- [ ] **v2.1**: Cloud Sync (Firebase/Supabase integration).
 - [ ] **v2.1**: Advanced CSV/JSON Export & Import.
 - [ ] **v2.2**: Dark/Light mode manual toggle and custom themes.
-- [ ] **v2.5**: Optical Character Recognition (OCR) for logging chapters from screenshots.
 
 ---
 
