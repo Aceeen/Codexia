@@ -19,8 +19,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.codexiabeta.CodexiaApplication
+import com.example.codexiabeta.viewmodel.ProfileViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,6 +43,27 @@ fun ProfileScreen(navController: NavController) {
     LaunchedEffect(Unit) {
         userName = app.userPreferences.userName.first()
         nameInput = userName
+    }
+
+    val viewModel: ProfileViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/comma-separated-values")) { uri ->
+        if (uri != null) {
+            viewModel.exportLibrary(uri)
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            viewModel.importLibrary(uri)
+        }
+    }
+
+    LaunchedEffect(viewModel.statusMessage) {
+        viewModel.statusMessage?.let { msg ->
+            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+            viewModel.clearStatusMessage()
+        }
     }
 
     Scaffold(
@@ -141,7 +168,10 @@ fun ProfileScreen(navController: NavController) {
                     icon = Icons.Default.IosShare,
                     title = "Export Library",
                     subtitle = "Save your library as a .csv file.",
-                    onClick = { Toast.makeText(context, "Export feature coming in v2.1", Toast.LENGTH_SHORT).show() }
+                    onClick = { 
+                        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+                        exportLauncher.launch("codexia_backup_$dateFormat.csv")
+                    }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 // Import Library Row
@@ -149,7 +179,7 @@ fun ProfileScreen(navController: NavController) {
                     icon = Icons.Default.Download,
                     title = "Import Library",
                     subtitle = "Import a previously exported .csv file.",
-                    onClick = { Toast.makeText(context, "Import feature coming in v2.1", Toast.LENGTH_SHORT).show() }
+                    onClick = { importLauncher.launch(arrayOf("text/comma-separated-values", "text/csv", "*/*")) }
                 )
             }
 
@@ -166,6 +196,26 @@ fun ProfileScreen(navController: NavController) {
                     onClick = { /* No action needed */ },
                     showChevron = false
                 )
+            }
+        }
+        
+        if (viewModel.isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable(enabled = false) {}, // Intercept touches
+                contentAlignment = Alignment.Center
+            ) {
+                Card(shape = RoundedCornerShape(16.dp)) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        CircularProgressIndicator()
+                        Text("Processing...", style = MaterialTheme.typography.titleMedium)
+                    }
+                }
             }
         }
     }

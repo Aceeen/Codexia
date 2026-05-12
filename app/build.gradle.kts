@@ -75,4 +75,8 @@ dependencies {
 
     // DataStore (user preferences)
     implementation(libs.androidx.datastore.preferences)
+
+    // CSV Export & Import
+    implementation(libs.kotlin.csv)
+    implementation(libs.gson)
 }

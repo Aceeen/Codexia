@@ -10,6 +10,9 @@ interface ShelfDao {
     @Query("SELECT * FROM shelves ORDER BY name ASC")
     fun getAllShelves(): Flow<List<ShelfEntity>>
 
+    @Query("SELECT * FROM shelves ORDER BY name ASC")
+    suspend fun getAllShelvesOnce(): List<ShelfEntity>
+
     @Query("SELECT * FROM shelves WHERE name = :name LIMIT 1")
     suspend fun getShelfByName(name: String): ShelfEntity?
 

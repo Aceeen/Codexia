@@ -6,6 +6,7 @@ import com.example.codexiabeta.data.UserPreferences
 import com.example.codexiabeta.data.repository.LogRepository
 import com.example.codexiabeta.data.repository.SeriesRepository
 import com.example.codexiabeta.data.repository.ShelfRepository
+import com.example.codexiabeta.data.repository.BackupRepository
 
 class CodexiaApplication : Application() {
 
@@ -25,5 +26,9 @@ class CodexiaApplication : Application() {
 
     val userPreferences: UserPreferences by lazy {
         UserPreferences(this)
+    }
+
+    val backupRepository: BackupRepository by lazy {
+        BackupRepository(database, seriesRepository)
     }
 }

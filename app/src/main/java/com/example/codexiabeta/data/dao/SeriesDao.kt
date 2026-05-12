@@ -14,6 +14,10 @@ interface SeriesDao {
     fun getAllSeriesWithGenres(): Flow<List<SeriesWithGenres>>
 
     @Transaction
+    @Query("SELECT * FROM series ORDER BY lastUpdated DESC")
+    suspend fun getAllSeriesWithGenresOnce(): List<SeriesWithGenres>
+
+    @Transaction
     @Query("SELECT * FROM series WHERE id = :seriesId")
     fun getSeriesWithGenresById(seriesId: String): Flow<SeriesWithGenres?>
 

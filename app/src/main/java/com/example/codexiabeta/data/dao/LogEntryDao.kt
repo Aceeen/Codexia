@@ -18,6 +18,9 @@ interface LogEntryDao {
     @Query("SELECT * FROM log_entries ORDER BY timestamp DESC")
     fun getAllLogEntries(): Flow<List<LogEntryEntity>>
 
+    @Query("SELECT * FROM log_entries ORDER BY timestamp DESC")
+    suspend fun getAllLogEntriesOnce(): List<LogEntryEntity>
+
     @Query("SELECT * FROM log_entries ORDER BY timestamp DESC LIMIT :limit")
     fun getRecentLogEntries(limit: Int): Flow<List<LogEntryEntity>>
 
