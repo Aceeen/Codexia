@@ -1,5 +1,3 @@
-// In screens/LibraryScreen.kt
-
 package com.example.codexiabeta.screens
 
 import androidx.compose.foundation.Image
@@ -26,34 +24,55 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.codexiabeta.model.DummyData
-import com.example.codexiabeta.model.Series
+import coil.compose.AsyncImage
+import com.example.codexiabeta.data.entity.SeriesWithGenres
+import com.example.codexiabeta.viewmodel.LibraryViewModel
 
 private enum class ViewType { LIST, GRID }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LibraryScreen(navController: NavController) {
+fun LibraryScreen(
+    navController: NavController,
+    viewModel: LibraryViewModel = viewModel()
+) {
     val haptics = LocalHapticFeedback.current
-    var searchQuery by remember { mutableStateOf("") }
-    var selectedTabIndex by remember { mutableIntStateOf(0) }
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val selectedShelf by viewModel.selectedShelf.collectAsStateWithLifecycle()
+    val shelves by viewModel.shelves.collectAsStateWithLifecycle()
+    val filteredSeries by viewModel.filteredSeries.collectAsStateWithLifecycle()
     var viewType by remember { mutableStateOf(ViewType.LIST) }
+
+    // Build tab list: "All" + shelf names
+    val tabNames = listOf("All") + shelves.map { it.name }
+    val selectedTabIndex = tabNames.indexOf(selectedShelf).coerceAtLeast(0)
 
     Scaffold(
         topBar = {
             Column(modifier = Modifier.background(MaterialTheme.colorScheme.background)) {
                 OutlinedTextField(
                     value = searchQuery,
-                    onValueChange = { searchQuery = it },
+                    onValueChange = { viewModel.onSearchQueryChange(it) },
                     label = { Text("Search your grimoire...") },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    shape = RoundedCornerShape(32.dp)
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { viewModel.onSearchQueryChange("") }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Clear search")
+                            }
+                        }
+                    },
+                    shape = RoundedCornerShape(32.dp),
+                    singleLine = true
                 )
             }
         },
@@ -61,7 +80,7 @@ fun LibraryScreen(navController: NavController) {
             FloatingActionButton(
                 onClick = {
                     haptics.performHapticFeedback(HapticFeedbackType.Confirm)
-                    navController.navigate("addEditSeries")
+                    navController.navigate("addEditSeries/ ")
                 },
                 containerColor = MaterialTheme.colorScheme.primary,
                 shape = RoundedCornerShape(16.dp)
@@ -76,25 +95,29 @@ fun LibraryScreen(navController: NavController) {
     ) { paddingValues ->
         Column(modifier = Modifier.padding(paddingValues)) {
             // --- SCROLLABLE TAB ROW ---
-            ScrollableTabRow(
-                selectedTabIndex = selectedTabIndex,
-                edgePadding = 16.dp,
-                containerColor = Color.Transparent,
-                contentColor = MaterialTheme.colorScheme.primary,
-                indicator = { tabPositions ->
-                    TabRowDefaults.SecondaryIndicator(
-                        Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
-                        height = 2.dp,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            ) {
-                DummyData.shelves.forEachIndexed { index, title ->
-                    Tab(
-                        selected = index == selectedTabIndex,
-                        onClick = { selectedTabIndex = index },
-                        text = { Text(title, fontWeight = FontWeight.SemiBold) }
-                    )
+            if (tabNames.size > 1) {
+                ScrollableTabRow(
+                    selectedTabIndex = selectedTabIndex,
+                    edgePadding = 16.dp,
+                    containerColor = Color.Transparent,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    indicator = { tabPositions ->
+                        if (selectedTabIndex < tabPositions.size) {
+                            TabRowDefaults.SecondaryIndicator(
+                                Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
+                                height = 2.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                ) {
+                    tabNames.forEachIndexed { index, title ->
+                        Tab(
+                            selected = index == selectedTabIndex,
+                            onClick = { viewModel.onShelfSelected(title) },
+                            text = { Text(title, fontWeight = FontWeight.SemiBold) }
+                        )
+                    }
                 }
             }
 
@@ -106,7 +129,7 @@ fun LibraryScreen(navController: NavController) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    "Sort by: Recently Updated",
+                    "${filteredSeries.size} titles",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -120,39 +143,71 @@ fun LibraryScreen(navController: NavController) {
                     )
                 }
             }
-            when (viewType) {
-                ViewType.LIST -> LibraryListView(navController)
-                ViewType.GRID -> LibraryGridView(navController)
+
+            if (filteredSeries.isEmpty()) {
+                // Empty state
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            Icons.Default.SearchOff,
+                            contentDescription = null,
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            "No results found",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            "Try a different search or shelf filter",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                when (viewType) {
+                    ViewType.LIST -> LibraryListView(navController, filteredSeries)
+                    ViewType.GRID -> LibraryGridView(navController, filteredSeries)
+                }
             }
         }
     }
 }
 
 @Composable
-private fun LibraryListView(navController: NavController) {
+private fun LibraryListView(navController: NavController, seriesList: List<SeriesWithGenres>) {
     LazyColumn(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        items(DummyData.seriesList) { series ->
-            SeriesListItem(series = series) {
-                navController.navigate("seriesDetail/${series.id}")
+        items(seriesList, key = { it.series.id }) { swg ->
+            SeriesListItem(series = swg) {
+                navController.navigate("seriesDetail/${swg.series.id}")
             }
         }
     }
 }
 
 @Composable
-private fun LibraryGridView(navController: NavController) {
+private fun LibraryGridView(navController: NavController, seriesList: List<SeriesWithGenres>) {
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 120.dp),
         contentPadding = PaddingValues(16.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        items(DummyData.seriesList) { series ->
-            SeriesGridItem(series = series) {
-                navController.navigate("seriesDetail/${series.id}")
+        items(seriesList, key = { it.series.id }) { swg ->
+            SeriesGridItem(series = swg) {
+                navController.navigate("seriesDetail/${swg.series.id}")
             }
         }
     }
@@ -160,23 +215,34 @@ private fun LibraryGridView(navController: NavController) {
 
 // --- GRID ITEM COMPOSABLE ---
 @Composable
-fun SeriesGridItem(series: Series, onClick: () -> Unit) {
+fun SeriesGridItem(series: SeriesWithGenres, onClick: () -> Unit) {
     Card(
         modifier = Modifier.clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column {
-            Image(
-                painter = painterResource(id = series.coverResId),
-                contentDescription = "${series.title} cover",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(2f / 3f)
-            )
+            if (series.series.coverPath != null) {
+                AsyncImage(
+                    model = series.series.coverPath,
+                    contentDescription = "${series.series.title} cover",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(2f / 3f)
+                )
+            } else {
+                Image(
+                    painter = painterResource(id = series.series.coverResId),
+                    contentDescription = "${series.series.title} cover",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(2f / 3f)
+                )
+            }
             Text(
-                text = series.title,
+                text = series.series.title,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(8.dp),
@@ -189,7 +255,7 @@ fun SeriesGridItem(series: Series, onClick: () -> Unit) {
 
 // --- LIST ITEM COMPOSABLE ---
 @Composable
-fun SeriesListItem(series: Series, onClick: () -> Unit) {
+fun SeriesListItem(series: SeriesWithGenres, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -202,25 +268,36 @@ fun SeriesListItem(series: Series, onClick: () -> Unit) {
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Image(
-                painter = painterResource(id = series.coverResId),
-                contentDescription = "${series.title} cover",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(width = 50.dp, height = 75.dp)
-                    .clip(RoundedCornerShape(8.dp))
-            )
+            if (series.series.coverPath != null) {
+                AsyncImage(
+                    model = series.series.coverPath,
+                    contentDescription = "${series.series.title} cover",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(width = 50.dp, height = 75.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                )
+            } else {
+                Image(
+                    painter = painterResource(id = series.series.coverResId),
+                    contentDescription = "${series.series.title} cover",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(width = 50.dp, height = 75.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                )
+            }
             Spacer(modifier = Modifier.width(16.dp))
             Column {
                 Text(
-                    series.title,
+                    series.series.title,
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    "Ch. ${series.latestChapter} • ${series.status} • ${series.lastUpdated}",
+                    "Ch. ${series.series.latestChapter} • ${series.series.status} • ${series.series.lastUpdated}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

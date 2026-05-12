@@ -1,5 +1,3 @@
-// In screens/MainScreen.kt
-
 package com.example.codexiabeta.screens
 
 import android.annotation.SuppressLint
@@ -27,13 +25,22 @@ fun MainScreen(mainNavController: NavHostController) {
     ) { innerPadding ->
         NavHost(
             navController = bottomBarNavController,
-            // --- SET HOME AS THE NEW START DESTINATION ---
             startDestination = NavigationItem.Home.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            // --- ADD THE NEW HOME COMPOSABLE TO THE GRAPH ---
             composable(NavigationItem.Home.route) {
-                HomeScreen(navController = mainNavController)
+                HomeScreen(
+                    navController = mainNavController,
+                    onNavigateToLibrary = {
+                        bottomBarNavController.navigate(NavigationItem.Library.route) {
+                            popUpTo(bottomBarNavController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                )
             }
             composable(NavigationItem.Library.route) {
                 LibraryScreen(navController = mainNavController)
@@ -47,7 +54,6 @@ fun MainScreen(mainNavController: NavHostController) {
 
 @Composable
 fun AppBottomNavigationBar(navController: NavHostController) {
-    // --- ADD HOME TO THE LIST OF ITEMS ---
     val navItems = listOf(NavigationItem.Home, NavigationItem.Library, NavigationItem.Insights)
 
     NavigationBar(
