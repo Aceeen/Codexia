@@ -28,7 +28,7 @@ class BackupRepository(
 ) {
     private val gson = Gson()
 
-    suspend fun exportToCsv(uri: Uri, context: Context): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun exportToCsv(uri: Uri, context: Context, userName: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val seriesList = db.seriesDao().getAllSeriesWithGenresOnce()
             val allLogs = db.logEntryDao().getAllLogEntriesOnce()
@@ -42,7 +42,7 @@ class BackupRepository(
             rows.add(listOf(
                 "id", "title", "author", "synopsis", "status", "shelfName",
                 "totalChapters", "sourceUrl", "genres", "logs", "coverUrl", "coverBase64",
-                "latestChapter", "lastUpdated"
+                "latestChapter", "lastUpdated", "userName"
             ))
 
             for (swg in seriesList) {
@@ -77,7 +77,8 @@ class BackupRepository(
                     coverUrl,
                     coverBase64,
                     series.latestChapter.toString(),
-                    series.lastUpdated
+                    series.lastUpdated,
+                    userName
                 ))
             }
 
@@ -92,15 +93,21 @@ class BackupRepository(
         }
     }
 
-    suspend fun importFromCsv(uri: Uri, context: Context): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun importFromCsv(uri: Uri, context: Context, onUserNameImported: suspend (String) -> Unit): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val inputStream = context.contentResolver.openInputStream(uri) ?: throw Exception("Could not open input stream")
             val rows: List<Map<String, String>> = csvReader().readAllWithHeader(inputStream)
 
             val logType = object : TypeToken<List<LogEntryEntity>>() {}.type
+            
+            var importedUserName: String? = null
 
             db.withTransaction {
                 for (row in rows) {
+                    if (importedUserName == null && row.containsKey("userName") && !row["userName"].isNullOrBlank()) {
+                        importedUserName = row["userName"]
+                    }
+
                     val id = row["id"] ?: UUID.randomUUID().toString()
                     val title = row["title"] ?: continue
                     val author = row["author"] ?: ""
@@ -164,6 +171,10 @@ class BackupRepository(
                         db.logEntryDao().insertLogEntry(log.copy(seriesId = id)) // Ensure ID matches
                     }
                 }
+            }
+            
+            if (importedUserName != null) {
+                onUserNameImported(importedUserName!!)
             }
 
             Result.success(Unit)

@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.codexiabeta.CodexiaApplication
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class ProfileViewModel(application: Application) : AndroidViewModel(application) {
@@ -22,7 +23,8 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             isLoading = true
             statusMessage = "Exporting library... This may take a moment."
-            val result = backupRepository.exportToCsv(uri, app)
+            val userName = app.userPreferences.userName.first()
+            val result = backupRepository.exportToCsv(uri, app, userName)
             
             if (result.isSuccess) {
                 statusMessage = "Library exported successfully!"
@@ -37,7 +39,9 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             isLoading = true
             statusMessage = "Importing library... Please wait."
-            val result = backupRepository.importFromCsv(uri, app)
+            val result = backupRepository.importFromCsv(uri, app) { importedName ->
+                app.userPreferences.setUserName(importedName)
+            }
             
             if (result.isSuccess) {
                 statusMessage = "Library imported successfully!"
