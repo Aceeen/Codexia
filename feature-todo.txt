@@ -1,0 +1,13 @@
+On the book details page, make sure the show more/show less button only appears if there's content to expand. Currently it's always there even when the description is empty.
+
+When there's already an existing reading log entry for a chapter, the user resubmits a new log for that same chapter, make sure theres a confirmation pop up to warn the user that the existing log entry will be overwritten and deleted. Make sure it uses the same ui as when deleteing a book.
+
+When the user adds a genre to a book, and there's already a similar genre make sure it a drop down list shows and the user can either type the whole word or just pick from there.
+
+For the shelf, make sure a book can be in multiple shelves.
+
+Need some sort of sort by genre or search books by genre.
+
+Make sure the Weekly reading activity graph works.
+
+On insights, if the user picks the filter of either this week, or this month, just remove the monthly reading activity graph since it's redundant or change it into a different graph.
