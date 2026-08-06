@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Monochrome notification icon (white-on-transparent) required by Android -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Book cover outline -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M18,2H6C4.9,2 4,2.9 4,4V20C4,21.1 4.9,22 6,22H18C19.1,22 20,21.1 20,20V4C20,2.9 19.1,2 18,2ZM18,20H6V4H18V20Z"/>
+    <!-- Spine line -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M8,4H10V20H8Z"/>
+    <!-- Text lines on page -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,7H17V9H12Z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,11H17V13H12Z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,15H15V17H12Z"/>
+</vector>

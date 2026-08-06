@@ -346,21 +346,23 @@ fun Masthead(series: SeriesWithGenres, latestChapter: Int?) {
 
             Spacer(Modifier.height(12.dp))
 
-            // Expandable synopsis
-            Text(
-                series.series.synopsis,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = if (isExpanded) Int.MAX_VALUE else 4
-            )
-            TextButton(
-                onClick = { isExpanded = !isExpanded },
-                contentPadding = PaddingValues(0.dp)
-            ) {
+            // Expandable synopsis — only shown if there is content
+            if (series.series.synopsis.isNotBlank()) {
                 Text(
-                    if (isExpanded) "Show less" else "Show more",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
+                    series.series.synopsis,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = if (isExpanded) Int.MAX_VALUE else 4
                 )
+                TextButton(
+                    onClick = { isExpanded = !isExpanded },
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Text(
+                        if (isExpanded) "Show less" else "Show more",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
         }
     }

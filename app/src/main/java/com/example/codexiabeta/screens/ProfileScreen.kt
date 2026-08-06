@@ -1,5 +1,8 @@
 package com.example.codexiabeta.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -17,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import com.example.codexiabeta.CodexiaApplication
 import com.example.codexiabeta.viewmodel.ProfileViewModel
@@ -56,6 +60,22 @@ fun ProfileScreen(navController: NavController) {
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             viewModel.importLibrary(uri)
+        }
+    }
+
+    // Runtime notification permission for Android 13+
+    val notificationPermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* result is informational; we post regardless */ }
+
+    fun ensureNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val granted = ContextCompat.checkSelfPermission(
+                context, Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!granted) {
+                notificationPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
         }
     }
 
@@ -168,7 +188,8 @@ fun ProfileScreen(navController: NavController) {
                     icon = Icons.Default.IosShare,
                     title = "Export Library",
                     subtitle = "Save your library as a .csv file.",
-                    onClick = { 
+                    onClick = {
+                        ensureNotificationPermission()
                         val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
                         exportLauncher.launch("codexia_backup_$dateFormat.csv")
                     }
@@ -179,7 +200,10 @@ fun ProfileScreen(navController: NavController) {
                     icon = Icons.Default.Download,
                     title = "Import Library",
                     subtitle = "Import a previously exported .csv file.",
-                    onClick = { importLauncher.launch(arrayOf("text/comma-separated-values", "text/csv", "*/*")) }
+                    onClick = {
+                        ensureNotificationPermission()
+                        importLauncher.launch(arrayOf("text/comma-separated-values", "text/csv", "*/*"))
+                    }
                 )
             }
 
