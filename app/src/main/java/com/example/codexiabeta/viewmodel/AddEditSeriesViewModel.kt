@@ -190,20 +190,23 @@ class AddEditSeriesViewModel(
             try {
                 val encodedQuery = URLEncoder.encode(query, "UTF-8")
                 
-                // 1. Google Image Search Scraping (No-JS version)
+                // 1. Yahoo Image Search Scraping (Much more scraping-friendly than Google)
                 try {
-                    val googleUrl = URL("https://www.google.com/search?q=$encodedQuery&tbm=isch&gbv=1")
-                    val connection = googleUrl.openConnection() as HttpURLConnection
-                    // Use an older User-Agent to ensure we get the simple HTML version
-                    connection.setRequestProperty("User-Agent", "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)")
+                    val yahooUrl = URL("https://images.search.yahoo.com/search/images?p=$encodedQuery")
+                    val connection = yahooUrl.openConnection() as HttpURLConnection
+                    connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
                     connection.connectTimeout = 5000
                     if (connection.responseCode == 200) {
                         val html = connection.inputStream.bufferedReader().use { it.readText() }
-                        // Extract encrypted-tbn0.gstatic.com URLs
-                        val pattern = java.util.regex.Pattern.compile("https://encrypted-tbn[0-9].gstatic.com/images\\?q=tbn:[^\"]+")
+                        // Yahoo uses Bing backend, images often look like https://tse1.mm.bing.net/...
+                        // But let's just grab any valid image src that isn't a tiny icon
+                        val pattern = java.util.regex.Pattern.compile("<img[^>]+src=[\"'](https?://[^\"]+?)[\"']")
                         val matcher = pattern.matcher(html)
                         while (matcher.find()) {
-                            results.add(matcher.group())
+                            val url = matcher.group(1)
+                            if (url != null && !url.contains("yimg.com") && !url.contains("yahoo.com")) {
+                                results.add(url.replace("&amp;", "&"))
+                            }
                         }
                     }
                 } catch (e: Exception) { e.printStackTrace() }

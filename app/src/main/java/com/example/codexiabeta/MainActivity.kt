@@ -36,6 +36,15 @@ class MainActivity : ComponentActivity() {
                         composable("main_screen") {
                             MainScreen(mainNavController = navController)
                         }
+                        composable("onboarding") {
+                            OnboardingScreen(
+                                onFinish = {
+                                    navController.navigate("main_screen") {
+                                        popUpTo("onboarding") { inclusive = true }
+                                    }
+                                }
+                            )
+                        }
                         composable("seriesDetail/{seriesId}") { backStackEntry ->
                             val seriesId = backStackEntry.arguments?.getString("seriesId")
                             SeriesDetailScreen(navController = navController, seriesId = seriesId ?: "1")

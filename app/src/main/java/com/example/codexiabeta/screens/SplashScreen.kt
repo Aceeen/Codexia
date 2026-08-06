@@ -16,12 +16,27 @@ import androidx.navigation.NavController
 import com.example.codexiabeta.R
 import kotlinx.coroutines.delay
 
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.codexiabeta.CodexiaApplication
+
 @Composable
 fun SplashScreen(navController: NavController) {
-    LaunchedEffect(key1 = true) {
+    val context = LocalContext.current
+    val app = context.applicationContext as CodexiaApplication
+    val onboardingCompleted by app.userPreferences.onboardingCompleted.collectAsStateWithLifecycle(initialValue = false)
+
+    LaunchedEffect(key1 = onboardingCompleted) {
         delay(1500L) // Wait for 1.5 seconds
-        navController.navigate("main_screen") {
-            popUpTo("splash") { inclusive = true }
+        if (onboardingCompleted) {
+            navController.navigate("main_screen") {
+                popUpTo("splash") { inclusive = true }
+            }
+        } else {
+            navController.navigate("onboarding") {
+                popUpTo("splash") { inclusive = true }
+            }
         }
     }
 

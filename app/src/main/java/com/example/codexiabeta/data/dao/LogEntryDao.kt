@@ -61,6 +61,9 @@ interface LogEntryDao {
     @Query("DELETE FROM log_entries WHERE id = :id")
     suspend fun deleteLogEntryById(id: String)
 
+    @Query("DELETE FROM log_entries WHERE seriesId = :seriesId")
+    suspend fun deleteLogEntriesBySeriesId(seriesId: String)
+
     @Query("SELECT MAX(chapter) FROM log_entries WHERE seriesId = :seriesId")
     fun getLatestChapterForSeries(seriesId: String): Flow<Int?>
 }

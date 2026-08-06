@@ -39,4 +39,7 @@ class LogRepository(private val logEntryDao: LogEntryDao) {
 
     suspend fun deleteLogEntryById(id: String) =
         logEntryDao.deleteLogEntryById(id)
+
+    suspend fun deleteLogEntriesBySeriesId(seriesId: String) =
+        logEntryDao.deleteLogEntriesBySeriesId(seriesId)
 }

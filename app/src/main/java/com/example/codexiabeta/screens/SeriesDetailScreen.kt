@@ -61,6 +61,8 @@ fun SeriesDetailScreen(navController: NavController, seriesId: String) {
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
     var editingLogEntry by remember { mutableStateOf<LogEntryEntity?>(null) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var pendingLogData by remember { mutableStateOf<Pair<Int, String>?>(null) }
 
     val currentSeries = series ?: return
 
@@ -75,6 +77,13 @@ fun SeriesDetailScreen(navController: NavController, seriesId: String) {
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showDeleteDialog = true }) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Delete Series",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
                     // Edit button now navigates with series ID
                     IconButton(onClick = { navController.navigate("addEditSeries/${currentSeries.series.id}") }) {
                         Icon(
@@ -103,10 +112,22 @@ fun SeriesDetailScreen(navController: NavController, seriesId: String) {
                 ProgressLogger(
                     editingEntry = editingLogEntry,
                     onLogEntry = { chapter, notes ->
-                        viewModel.addLogEntry(chapter, notes)
-                        editingLogEntry = null
-                        scope.launch {
-                            snackbarHostState.showSnackbar("Entry logged for Chapter $chapter.")
+                        if (editingLogEntry != null) {
+                            viewModel.addLogEntry(chapter, notes)
+                            editingLogEntry = null
+                            scope.launch {
+                                snackbarHostState.showSnackbar("Entry updated.")
+                            }
+                        } else {
+                            val chapterExists = logHistory.any { it.chapter == chapter }
+                            if (chapterExists) {
+                                pendingLogData = Pair(chapter, notes)
+                            } else {
+                                viewModel.addLogEntry(chapter, notes)
+                                scope.launch {
+                                    snackbarHostState.showSnackbar("Entry logged for Chapter $chapter.")
+                                }
+                            }
                         }
                     },
                     onCancelEdit = {
@@ -157,6 +178,57 @@ fun SeriesDetailScreen(navController: NavController, seriesId: String) {
                 )
             }
         }
+    }
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Delete Series") },
+            text = { Text("Are you sure you want to delete '${currentSeries.series.title}'? This action cannot be undone and will delete all associated logs.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteDialog = false
+                        viewModel.deleteSeries {
+                            navController.popBackStack()
+                        }
+                    }
+                ) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    pendingLogData?.let { (chapter, notes) ->
+        AlertDialog(
+            onDismissRequest = { pendingLogData = null },
+            title = { Text("Overwrite Reading Log?") },
+            text = { Text("A log for Chapter $chapter already exists. Saving this will overwrite the previous notes and timestamp.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.addLogEntry(chapter, notes)
+                        pendingLogData = null
+                        scope.launch {
+                            snackbarHostState.showSnackbar("Chapter $chapter log overwritten.")
+                        }
+                    }
+                ) {
+                    Text("Overwrite")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingLogData = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 

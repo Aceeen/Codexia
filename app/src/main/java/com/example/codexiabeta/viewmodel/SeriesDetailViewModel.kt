@@ -104,4 +104,14 @@ class SeriesDetailViewModel(
     fun onSortChanged(sort: SortOrder) {
         selectedSort.value = sort
     }
+
+    fun deleteSeries(onDeleted: () -> Unit) {
+        viewModelScope.launch {
+            series.value?.series?.let { s ->
+                logRepository.deleteLogEntriesBySeriesId(seriesId)
+                seriesRepository.deleteSeries(s)
+                onDeleted()
+            }
+        }
+    }
 }
