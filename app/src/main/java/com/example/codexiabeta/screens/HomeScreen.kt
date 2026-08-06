@@ -51,6 +51,7 @@ fun HomeScreen(
 ) {
     val userName by viewModel.userName.collectAsStateWithLifecycle()
     val allSeries by viewModel.allSeries.collectAsStateWithLifecycle()
+    val continueReadingSeries by viewModel.continueReadingSeries.collectAsStateWithLifecycle()
     val recentLogs by viewModel.recentLogs.collectAsStateWithLifecycle()
     val greeting = viewModel.getGreeting()
 
@@ -68,7 +69,7 @@ fun HomeScreen(
         )
         ContinueReadingSection(
             navController = navController,
-            seriesList = allSeries,
+            seriesList = continueReadingSeries,
             onViewAllClick = onNavigateToLibrary
         )
         HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))

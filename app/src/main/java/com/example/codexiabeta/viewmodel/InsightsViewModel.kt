@@ -66,6 +66,40 @@ class InsightsViewModel(application: Application) : AndroidViewModel(application
         logRepository.getMonthlyLogCounts(getStartTimestamp(range), null)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val weeklyReadingActivity: StateFlow<List<Float>> = logRepository.getAllTimestamps()
+        .map { timestamps ->
+            val cal = Calendar.getInstance()
+            cal.set(Calendar.DAY_OF_WEEK, Calendar.SUNDAY)
+            cal.set(Calendar.HOUR_OF_DAY, 0)
+            cal.set(Calendar.MINUTE, 0)
+            cal.set(Calendar.SECOND, 0)
+            cal.set(Calendar.MILLISECOND, 0)
+            val startOfWeek = cal.timeInMillis
+
+            cal.add(Calendar.DAY_OF_WEEK, 6)
+            cal.set(Calendar.HOUR_OF_DAY, 23)
+            cal.set(Calendar.MINUTE, 59)
+            cal.set(Calendar.SECOND, 59)
+            val endOfWeek = cal.timeInMillis
+
+            val thisWeekTimestamps = timestamps.filter { it in startOfWeek..endOfWeek }
+
+            val dayCounts = IntArray(7) { 0 }
+            val itemCal = Calendar.getInstance()
+            for (ts in thisWeekTimestamps) {
+                itemCal.timeInMillis = ts
+                val dayOfWeek = itemCal.get(Calendar.DAY_OF_WEEK)
+                dayCounts[dayOfWeek - 1]++
+            }
+
+            val maxCount = dayCounts.maxOrNull() ?: 0
+            if (maxCount > 0) {
+                dayCounts.map { it.toFloat() / maxCount }
+            } else {
+                dayCounts.map { 0f }
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), List(7) { 0f })
+
     // Reading streak calculation
     val currentStreak: StateFlow<Int> = logRepository.getAllTimestamps()
         .map { timestamps -> calculateStreak(timestamps) }

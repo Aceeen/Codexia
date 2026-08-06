@@ -43,7 +43,9 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         if (shelf != "All") {
             val shelfEntity = shelfList.find { it.name == shelf }
             if (shelfEntity != null) {
-                filtered = filtered.filter { it.series.shelfId == shelfEntity.id }
+                filtered = filtered.filter { swg ->
+                    swg.shelves.any { it.id == shelfEntity.id }
+                }
             }
         }
 

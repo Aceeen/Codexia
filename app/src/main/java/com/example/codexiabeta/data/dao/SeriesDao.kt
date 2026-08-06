@@ -3,6 +3,7 @@ package com.example.codexiabeta.data.dao
 import androidx.room.*
 import com.example.codexiabeta.data.entity.SeriesEntity
 import com.example.codexiabeta.data.entity.SeriesGenreCrossRef
+import com.example.codexiabeta.data.entity.SeriesShelfCrossRef
 import com.example.codexiabeta.data.entity.SeriesWithGenres
 import kotlinx.coroutines.flow.Flow
 
@@ -26,10 +27,11 @@ interface SeriesDao {
     suspend fun getSeriesWithGenresByIdOnce(seriesId: String): SeriesWithGenres?
 
     @Query("""
-        SELECT * FROM series 
-        WHERE (title LIKE '%' || :query || '%' OR author LIKE '%' || :query || '%')
-        AND (:shelfId IS NULL OR shelfId = :shelfId)
-        ORDER BY lastUpdated DESC
+        SELECT DISTINCT s.* FROM series s 
+        LEFT JOIN series_shelf_cross_ref r ON s.id = r.seriesId
+        WHERE (s.title LIKE '%' || :query || '%' OR s.author LIKE '%' || :query || '%')
+        AND (:shelfId IS NULL OR r.shelfId = :shelfId)
+        ORDER BY s.lastUpdated DESC
     """)
     fun searchSeries(query: String, shelfId: String?): Flow<List<SeriesEntity>>
 
@@ -47,6 +49,12 @@ interface SeriesDao {
 
     @Query("DELETE FROM series_genre_cross_ref WHERE seriesId = :seriesId")
     suspend fun deleteGenresForSeries(seriesId: String)
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertShelfCrossRef(crossRef: SeriesShelfCrossRef)
+
+    @Query("DELETE FROM series_shelf_cross_ref WHERE seriesId = :seriesId")
+    suspend fun deleteShelvesForSeries(seriesId: String)
 
     @Query("UPDATE series SET latestChapter = :chapter WHERE id = :seriesId")
     suspend fun updateLatestChapter(seriesId: String, chapter: Int)

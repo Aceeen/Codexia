@@ -15,5 +15,15 @@ data class SeriesWithGenres(
             entityColumn = "genreName"
         )
     )
-    val genres: List<GenreEntity>
+    val genres: List<GenreEntity>,
+    @Relation(
+        parentColumn = "id",
+        entityColumn = "id",
+        associateBy = Junction(
+            value = SeriesShelfCrossRef::class,
+            parentColumn = "seriesId",
+            entityColumn = "shelfId"
+        )
+    )
+    val shelves: List<ShelfEntity>
 )

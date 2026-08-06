@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.codexiabeta.CodexiaApplication
 import com.example.codexiabeta.data.entity.SeriesEntity
 import com.example.codexiabeta.data.entity.ShelfEntity
+import com.example.codexiabeta.data.entity.GenreEntity
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -35,11 +36,10 @@ class AddEditSeriesViewModel(
     var synopsis by mutableStateOf("")
     var genres by mutableStateOf(listOf<String>())
     var selectedStatus by mutableStateOf("Ongoing")
-    var selectedShelfName by mutableStateOf("")
-    var selectedShelfId by mutableStateOf("")
     var totalChapters by mutableStateOf("")
     var coverPath by mutableStateOf<String?>(null)
     var coverResId by mutableStateOf(0)
+    var selectedShelfIds by mutableStateOf(listOf<String>())
 
     // Validation errors
     var titleError by mutableStateOf<String?>(null)
@@ -59,6 +59,9 @@ class AddEditSeriesViewModel(
     val shelves: StateFlow<List<ShelfEntity>> = shelfRepository.getAllShelves()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val allGenres: StateFlow<List<GenreEntity>> = seriesRepository.getAllGenres()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     init {
         viewModelScope.launch {
             if (seriesId != null) {
@@ -70,21 +73,15 @@ class AddEditSeriesViewModel(
                     synopsis = swg.series.synopsis
                     genres = swg.genres.map { it.name }
                     selectedStatus = swg.series.status
-                    selectedShelfId = swg.series.shelfId
+                    selectedShelfIds = swg.shelves.map { it.id }
                     totalChapters = swg.series.totalChapters?.toString() ?: ""
                     coverPath = swg.series.coverPath
                     coverResId = swg.series.coverResId
-
-                    // Resolve shelf name
-                    shelves.first { it.isNotEmpty() }.let { shelfList ->
-                        selectedShelfName = shelfList.find { it.id == swg.series.shelfId }?.name ?: ""
-                    }
                 }
             } else {
                 // Default for new series - wait for shelves to load
                 shelves.first { it.isNotEmpty() }.let { shelfList ->
-                    selectedShelfName = shelfList.firstOrNull()?.name ?: ""
-                    selectedShelfId = shelfList.firstOrNull()?.id ?: ""
+                    selectedShelfIds = listOf(shelfList.firstOrNull()?.id).filterNotNull()
                 }
             }
             isLoading = false
@@ -119,7 +116,7 @@ class AddEditSeriesViewModel(
 
     fun save() {
         if (!validate()) return
-
+ 
         viewModelScope.launch {
             val series = SeriesEntity(
                 id = seriesId ?: UUID.randomUUID().toString(),
@@ -131,20 +128,20 @@ class AddEditSeriesViewModel(
                 latestChapter = 0,
                 totalChapters = totalChapters.toIntOrNull(),
                 lastUpdated = "Just now",
-                shelfId = selectedShelfId,
                 synopsis = synopsis.trim(),
                 sourceUrl = sourceUrl.trim().ifBlank { null }
             )
-
+ 
             if (isEditMode) {
                 // Preserve latestChapter from existing
                 val existing = seriesRepository.getSeriesWithGenresByIdOnce(seriesId!!)
                 seriesRepository.updateSeries(
                     series.copy(latestChapter = existing?.series?.latestChapter ?: 0),
-                    genres
+                    genres,
+                    selectedShelfIds
                 )
             } else {
-                seriesRepository.insertSeries(series, genres)
+                seriesRepository.insertSeries(series, genres, selectedShelfIds)
             }
             saveComplete = true
         }
@@ -161,20 +158,22 @@ class AddEditSeriesViewModel(
         genres = genres.filterNot { it == genre }
     }
 
-    fun selectShelf(shelfName: String, shelfId: String) {
-        selectedShelfName = shelfName
-        selectedShelfId = shelfId
+    fun toggleShelfSelection(shelfId: String) {
+        selectedShelfIds = if (shelfId in selectedShelfIds) {
+            selectedShelfIds.filter { it != shelfId }
+        } else {
+            selectedShelfIds + shelfId
+        }
     }
-
+ 
     suspend fun createNewShelf(name: String): Result<ShelfEntity> {
         if (name.isBlank()) return Result.failure(Exception("Shelf name cannot be blank"))
         val existing = shelfRepository.getShelfByName(name)
         if (existing != null) return Result.failure(Exception("Shelf \"$name\" already exists"))
-
+ 
         val newShelf = ShelfEntity(name = name.trim())
         shelfRepository.insertShelf(newShelf)
-        selectedShelfName = newShelf.name
-        selectedShelfId = newShelf.id
+        selectedShelfIds = selectedShelfIds + newShelf.id
         return Result.success(newShelf)
     }
 

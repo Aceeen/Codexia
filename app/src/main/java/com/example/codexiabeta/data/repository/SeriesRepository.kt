@@ -15,19 +15,26 @@ class SeriesRepository(
     fun getSeriesWithGenresById(seriesId: String): Flow<SeriesWithGenres?> =
         seriesDao.getSeriesWithGenresById(seriesId)
 
+    fun getAllGenres(): Flow<List<GenreEntity>> =
+        genreDao.getAllGenres()
+
     suspend fun getSeriesWithGenresByIdOnce(seriesId: String): SeriesWithGenres? =
         seriesDao.getSeriesWithGenresByIdOnce(seriesId)
 
-    suspend fun insertSeries(series: SeriesEntity, genres: List<String>) {
+    suspend fun insertSeries(series: SeriesEntity, genres: List<String>, shelfIds: List<String>) {
         seriesDao.insertSeries(series)
         // Insert genres and cross-refs
         genres.forEach { genreName ->
             genreDao.insertGenre(GenreEntity(genreName))
             seriesDao.insertGenreCrossRef(SeriesGenreCrossRef(series.id, genreName))
         }
+        // Insert shelf cross-refs
+        shelfIds.forEach { shelfId ->
+            seriesDao.insertShelfCrossRef(SeriesShelfCrossRef(series.id, shelfId))
+        }
     }
 
-    suspend fun updateSeries(series: SeriesEntity, genres: List<String>) {
+    suspend fun updateSeries(series: SeriesEntity, genres: List<String>, shelfIds: List<String>) {
         seriesDao.updateSeries(series)
         // Re-create genre cross-refs
         seriesDao.deleteGenresForSeries(series.id)
@@ -35,10 +42,16 @@ class SeriesRepository(
             genreDao.insertGenre(GenreEntity(genreName))
             seriesDao.insertGenreCrossRef(SeriesGenreCrossRef(series.id, genreName))
         }
+        // Re-create shelf cross-refs
+        seriesDao.deleteShelvesForSeries(series.id)
+        shelfIds.forEach { shelfId ->
+            seriesDao.insertShelfCrossRef(SeriesShelfCrossRef(series.id, shelfId))
+        }
     }
 
     suspend fun deleteSeries(series: SeriesEntity) {
         seriesDao.deleteGenresForSeries(series.id)
+        seriesDao.deleteShelvesForSeries(series.id)
         seriesDao.deleteSeries(series)
     }
 

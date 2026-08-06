@@ -15,7 +15,6 @@ data class SeriesEntity(
     val latestChapter: Int,
     val totalChapters: Int? = null,
     val lastUpdated: String,
-    val shelfId: String,
     val synopsis: String,
     val sourceUrl: String? = null
 )

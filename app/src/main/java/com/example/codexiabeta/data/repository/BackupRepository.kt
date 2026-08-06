@@ -47,7 +47,7 @@ class BackupRepository(
 
             for (swg in seriesList) {
                 val series = swg.series
-                val shelfName = shelfMap[series.shelfId]?.name ?: ""
+                val shelfName = swg.shelves.joinToString("|") { it.name }
                 val genresStr = swg.genres.joinToString("|") { it.name }
                 val logsStr = gson.toJson(logMap[series.id] ?: emptyList<LogEntryEntity>())
 
@@ -137,15 +137,18 @@ class BackupRepository(
                         finalCoverPath = decodeBase64ToImage(context, coverBase64, id)
                     }
 
-                    // Handle Shelf
-                    var shelfId = ""
-                    if (shelfName.isNotBlank()) {
-                        var shelf = db.shelfDao().getShelfByName(shelfName)
+                    // Handle Shelves
+                    val shelfNames = if (shelfName.isNotBlank()) shelfName.split("|") else emptyList()
+                    val shelfIds = mutableListOf<String>()
+                    for (name in shelfNames) {
+                        val trimmed = name.trim()
+                        if (trimmed.isBlank()) continue
+                        var shelf = db.shelfDao().getShelfByName(trimmed)
                         if (shelf == null) {
-                            shelf = ShelfEntity(name = shelfName)
+                            shelf = ShelfEntity(name = trimmed)
                             db.shelfDao().insertShelf(shelf)
                         }
-                        shelfId = shelf.id
+                        shelfIds.add(shelf.id)
                     }
 
                     val series = SeriesEntity(
@@ -158,13 +161,12 @@ class BackupRepository(
                         latestChapter = latestChapter,
                         totalChapters = totalChapters,
                         lastUpdated = lastUpdated,
-                        shelfId = shelfId,
                         synopsis = synopsis,
                         sourceUrl = sourceUrl
                     )
 
-                    // Overwrite series and genres
-                    seriesRepository.insertSeries(series, genres)
+                    // Overwrite series, genres, and shelves
+                    seriesRepository.insertSeries(series, genres, shelfIds)
 
                     // Insert logs
                     for (log in logs) {

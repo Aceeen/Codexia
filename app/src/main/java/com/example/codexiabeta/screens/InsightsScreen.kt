@@ -40,6 +40,7 @@ fun InsightsScreen(
     val currentStreak by viewModel.currentStreak.collectAsStateWithLifecycle()
     val totalLogCount by viewModel.totalLogCount.collectAsStateWithLifecycle()
     val monthlyLogCounts by viewModel.monthlyLogCounts.collectAsStateWithLifecycle()
+    val weeklyReadingActivity by viewModel.weeklyReadingActivity.collectAsStateWithLifecycle()
     val allSeries by viewModel.allSeries.collectAsStateWithLifecycle()
 
     Scaffold(
@@ -78,10 +79,10 @@ fun InsightsScreen(
                     ?.key ?: "—"
             )
 
-            WeeklyActivityChart()
+            WeeklyActivityChart(weeklyReadingActivity)
 
-            // Monthly activity chart
-            if (monthlyLogCounts.isNotEmpty()) {
+            // Monthly activity chart - hide if selected range is THIS_WEEK or THIS_MONTH
+            if (selectedRange != DateRange.THIS_WEEK && selectedRange != DateRange.THIS_MONTH && monthlyLogCounts.isNotEmpty()) {
                 MonthlyActivityChart(
                     monthlyCounts = monthlyLogCounts.map {
                         Pair(viewModel.getMonthLabel(it.month), it.count)
@@ -173,8 +174,7 @@ fun StatItem(label: String, value: String) {
 }
 
 @Composable
-fun WeeklyActivityChart() {
-    val dummyWeeklyData = listOf(0.4f, 0.6f, 0.2f, 0.9f, 0.5f, 0.7f, 0.3f)
+fun WeeklyActivityChart(weeklyData: List<Float>) {
     val dayLabels = listOf("S", "M", "T", "W", "T", "F", "S")
 
     Column {
@@ -191,11 +191,11 @@ fun WeeklyActivityChart() {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.Bottom
                 ) {
-                    dummyWeeklyData.forEach { value ->
+                    weeklyData.forEach { value ->
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .fillMaxHeight(fraction = value)
+                                .fillMaxHeight(fraction = value.coerceAtLeast(0.02f))
                                 .padding(horizontal = 4.dp)
                                 .clip(RoundedCornerShape(4.dp))
                                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.8f))

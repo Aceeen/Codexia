@@ -22,6 +22,26 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     val allSeries: StateFlow<List<SeriesWithGenres>> = seriesRepository.getAllSeriesWithGenres()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    private val allLogs: StateFlow<List<LogEntryEntity>> = logRepository.getAllLogEntries()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val continueReadingSeries: StateFlow<List<SeriesWithGenres>> = combine(
+        allSeries,
+        allLogs
+    ) { seriesList, logs ->
+        val latestLogTimestampMap = logs
+            .groupBy { it.seriesId }
+            .mapValues { (_, seriesLogs) -> seriesLogs.maxOfOrNull { it.timestamp } ?: 0L }
+
+        seriesList.sortedWith(
+            compareByDescending<SeriesWithGenres> { swg ->
+                latestLogTimestampMap[swg.series.id] ?: 0L
+            }.thenByDescending { swg ->
+                swg.series.lastUpdated
+            }
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     val recentLogs: StateFlow<List<LogEntryEntity>> = logRepository.getRecentLogEntries(5)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 

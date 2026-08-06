@@ -22,9 +22,10 @@ import java.util.UUID
         ShelfEntity::class,
         GenreEntity::class,
         SeriesGenreCrossRef::class,
-        LogEntryEntity::class
+        LogEntryEntity::class,
+        SeriesShelfCrossRef::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

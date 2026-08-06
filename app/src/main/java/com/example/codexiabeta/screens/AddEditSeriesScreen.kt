@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -218,8 +219,10 @@ fun AddEditSeriesScreen(navController: NavController, seriesId: String? = null) 
                     color = MaterialTheme.colorScheme.error
                 )
             }
+            val allGenresList by viewModel.allGenres.collectAsStateWithLifecycle()
             GenreTagInput(
                 currentGenres = viewModel.genres,
+                availableGenres = allGenresList.map { it.name },
                 onGenreAdded = { viewModel.addGenre(it) },
                 onGenreRemoved = { viewModel.removeGenre(it) }
             )
@@ -233,9 +236,9 @@ fun AddEditSeriesScreen(navController: NavController, seriesId: String? = null) 
                 onStatusChanged = { viewModel.selectedStatus = it }
             )
             ShelfDropdown(
-                selectedShelfName = viewModel.selectedShelfName,
+                selectedShelfIds = viewModel.selectedShelfIds,
                 shelves = shelves,
-                onShelfSelected = { name, id -> viewModel.selectShelf(name, id) },
+                onShelfToggled = { id -> viewModel.toggleShelfSelection(id) },
                 onCreateNewShelf = { showCreateShelfDialog = true }
             )
 
@@ -381,35 +384,81 @@ fun AddEditSeriesScreen(navController: NavController, seriesId: String? = null) 
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GenreTagInput(
     currentGenres: List<String>,
+    availableGenres: List<String>,
     onGenreAdded: (String) -> Unit,
     onGenreRemoved: (String) -> Unit
 ) {
     var text by remember { mutableStateOf("") }
+    var isExpanded by remember { mutableStateOf(false) }
+
+    val suggestions = remember(text, availableGenres, currentGenres) {
+        if (text.isBlank()) {
+            emptyList()
+        } else {
+            availableGenres.filter { 
+                it.contains(text, ignoreCase = true) && it !in currentGenres 
+            }
+        }
+    }
+
+    LaunchedEffect(suggestions) {
+        isExpanded = suggestions.isNotEmpty()
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        // Input field for new genres
-        OutlinedTextField(
-            value = text,
-            onValueChange = { text = it },
-            label = { Text("Add a genre tag") },
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = {
-                onGenreAdded(text)
-                text = "" // Clear text after adding
-            }),
-            trailingIcon = {
-                IconButton(onClick = {
-                    onGenreAdded(text)
-                    text = ""
-                }) {
-                    Icon(Icons.Default.AddCircle, contentDescription = "Add Genre")
+        ExposedDropdownMenuBox(
+            expanded = isExpanded,
+            onExpandedChange = { }
+        ) {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                label = { Text("Add a genre tag") },
+                modifier = Modifier.fillMaxWidth().menuAnchor(),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = {
+                    if (text.isNotBlank()) {
+                        onGenreAdded(text)
+                        text = ""
+                        isExpanded = false
+                    }
+                }),
+                trailingIcon = {
+                    IconButton(onClick = {
+                        if (text.isNotBlank()) {
+                            onGenreAdded(text)
+                            text = ""
+                            isExpanded = false
+                        }
+                    }) {
+                        Icon(Icons.Default.AddCircle, contentDescription = "Add Genre")
+                    }
+                }
+            )
+
+            if (suggestions.isNotEmpty()) {
+                ExposedDropdownMenu(
+                    expanded = isExpanded,
+                    onDismissRequest = { isExpanded = false },
+                    modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                ) {
+                    suggestions.forEach { suggestion ->
+                        DropdownMenuItem(
+                            text = { Text(suggestion, color = MaterialTheme.colorScheme.onSurface) },
+                            onClick = {
+                                onGenreAdded(suggestion)
+                                text = ""
+                                isExpanded = false
+                            }
+                        )
+                    }
                 }
             }
-        )
+        }
 
         // Horizontally scrolling row of existing genre chips
         LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -450,15 +499,20 @@ fun StatusDropdown(selectedStatus: String, onStatusChanged: (String) -> Unit) {
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isExpanded) },
             modifier = Modifier
                 .menuAnchor()
-                .fillMaxWidth()
+                .fillMaxWidth(),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+            )
         )
         ExposedDropdownMenu(
             expanded = isExpanded,
-            onDismissRequest = { isExpanded = false }
+            onDismissRequest = { isExpanded = false },
+            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
         ) {
             items.forEach { item ->
                 DropdownMenuItem(
-                    text = { Text(item) },
+                    text = { Text(item, color = MaterialTheme.colorScheme.onSurface) },
                     onClick = {
                         onStatusChanged(item)
                         isExpanded = false
@@ -472,37 +526,63 @@ fun StatusDropdown(selectedStatus: String, onStatusChanged: (String) -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ShelfDropdown(
-    selectedShelfName: String,
+    selectedShelfIds: List<String>,
     shelves: List<com.example.codexiabeta.data.entity.ShelfEntity>,
-    onShelfSelected: (String, String) -> Unit,
+    onShelfToggled: (String) -> Unit,
     onCreateNewShelf: () -> Unit
 ) {
     var isExpanded by remember { mutableStateOf(false) }
+
+    val displayText = remember(selectedShelfIds, shelves) {
+        if (selectedShelfIds.isEmpty()) {
+            "No shelves selected"
+        } else {
+            shelves.filter { it.id in selectedShelfIds }
+                .joinToString(", ") { it.name }
+        }
+    }
 
     ExposedDropdownMenuBox(
         expanded = isExpanded,
         onExpandedChange = { isExpanded = !isExpanded }
     ) {
         OutlinedTextField(
-            value = selectedShelfName,
+            value = displayText,
             onValueChange = {},
             readOnly = true,
-            label = { Text("Shelf") },
+            label = { Text("Shelves") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isExpanded) },
             modifier = Modifier
                 .menuAnchor()
-                .fillMaxWidth()
+                .fillMaxWidth(),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+            )
         )
         ExposedDropdownMenu(
             expanded = isExpanded,
-            onDismissRequest = { isExpanded = false }
+            onDismissRequest = { isExpanded = false },
+            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
         ) {
             shelves.forEach { shelf ->
                 DropdownMenuItem(
-                    text = { Text(shelf.name) },
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = shelf.id in selectedShelfIds,
+                                onCheckedChange = { onShelfToggled(shelf.id) },
+                                colors = CheckboxDefaults.colors(
+                                    checkedColor = MaterialTheme.colorScheme.primary,
+                                    uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(shelf.name, color = MaterialTheme.colorScheme.onSurface)
+                        }
+                    },
                     onClick = {
-                        onShelfSelected(shelf.name, shelf.id)
-                        isExpanded = false
+                        onShelfToggled(shelf.id)
                     }
                 )
             }
