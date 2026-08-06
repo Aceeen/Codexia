@@ -8,9 +8,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.codexiabeta.screens.*
 import com.example.codexiabeta.ui.theme.CodexiaBetaTheme
 
@@ -38,8 +40,22 @@ class MainActivity : ComponentActivity() {
                             val seriesId = backStackEntry.arguments?.getString("seriesId")
                             SeriesDetailScreen(navController = navController, seriesId = seriesId ?: "1")
                         }
-                        composable("addEditSeries") {
-                            AddEditSeriesScreen(navController = navController)
+                        composable(
+                            route = "addEditSeries/{seriesId}",
+                            arguments = listOf(navArgument("seriesId") {
+                                type = NavType.StringType
+                                nullable = true
+                                defaultValue = null
+                            })
+                        ) { backStackEntry ->
+                            val seriesId = backStackEntry.arguments?.getString("seriesId")
+                            AddEditSeriesScreen(
+                                navController = navController,
+                                seriesId = seriesId
+                            )
+                        }
+                        composable("profile") {
+                            ProfileScreen(navController = navController)
                         }
                     }
                 }

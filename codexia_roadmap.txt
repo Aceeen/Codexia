@@ -1,0 +1,69 @@
+Phase 1 Foundation
+Everything else depends on this. Migrate from DummyData.kt to a real Room database with ViewModels, wire up the broken progress logger, and fix navigation bugs.
+
+Core
+Room database + ViewModels
+Entities, DAOs, Repositories, ViewModels. Seeds default shelves on first launch.
+Core
+Progress logger wiring
+Add mutableStateOf to chapter/notes fields, validate input, create LogEntry on submit.
+Fix
+"View All" navigation fix
+Route through bottomBarNavController, not the main nav graph, to switch tabs cleanly.
+Feature
+Dynamic greeting
+Time-based greeting from Calendar.HOUR_OF_DAY. User name from DataStore, defaults to "Reader".
+
+Phase 2 Library & Content
+Make the library actually usable. Search, filtering, editing, and form validation — core content management before adding visual polish.
+
+Feature
+Library search & shelf filter
+MutableStateFlow + combine() for real-time filtering by title, author, and shelf tab.
+Feature
+Edit mode
+addEditSeries/{seriesId?} route. Pre-populate form from Room. insert() vs update() on save.
+Feature
+Form validation
+Title, author required. URL format check. At least one genre. Inline error messages.
+Feature
+Expandable synopsis
+animateContentSize() with Show more / Show less toggle on SeriesDetailScreen.
+Feature
+Create new shelf dialog
+AlertDialog on "+ Create New Shelf". Validates non-blank, non-duplicate. Inserts into Room.
+
+Phase 3 Detail screen & ux
+Enrich the series detail experience and add polish to existing interactions — progress bar, cover images, swipe gestures, and log sorting.
+
+Feature
+Chapter progress bar
+LinearProgressIndicator in Masthead. Needs totalChapters: Int? in Series entity.
+Feature
+Source URL button
+OutlinedButton in Masthead. Opens Intent.ACTION_VIEW. Only shown if URL is non-blank.
+Feature
+Cover image picker
+Gallery pick via ActivityResultContracts.GetContent(). Coil AsyncImage preview. Saves URI to Room.
+Polish
+Swipe-to-delete logs
+SwipeToDismissBox wrapping LogHistoryItem. Reveals red background. Connects to existing undo Snackbar.
+Polish
+Sort & filter log history
+Chip row: Newest, Oldest, Pinned First, Chapter ↑↓. MutableStateFlow in ViewModel.
+
+Phase 4 insight & cover search
+Bring The Oracle to life with real data, and add online cover search as the final complex integration requiring an external API.
+
+Feature
+Reading streak tracker
+Walk LogEntry timestamps backward. StateFlow in InsightsViewModel. Milestone messages at 7/30/100 days.
+Feature
+Monthly chapter chart
+SQL GROUP BY month. MonthlyActivityChart composable. Bars scaled relative to dataset max.
+Feature
+Date range filter
+FilterChip row (This Week / Month / Year / All Time). All Insights queries filter by selectedRange.
+Complex
+Online cover search
+CoverSearchScreen with image API grid. Downloads to internal storage. Requires BuildConfig API key.

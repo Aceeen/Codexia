@@ -14,7 +14,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -22,15 +21,27 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.codexiabeta.model.DummyData
+import com.example.codexiabeta.viewmodel.DateRange
+import com.example.codexiabeta.viewmodel.InsightsViewModel
 
-// Data class for our new chart. In a real app, this would be generated from a database query.
+// Data class for genre chart
 data class GenreCount(val genre: String, val count: Int)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun InsightsScreen(navController: NavController) {
+fun InsightsScreen(
+    navController: NavController,
+    viewModel: InsightsViewModel = viewModel()
+) {
+    val selectedRange by viewModel.selectedRange.collectAsStateWithLifecycle()
+    val currentStreak by viewModel.currentStreak.collectAsStateWithLifecycle()
+    val totalLogCount by viewModel.totalLogCount.collectAsStateWithLifecycle()
+    val monthlyLogCounts by viewModel.monthlyLogCounts.collectAsStateWithLifecycle()
+    val allSeries by viewModel.allSeries.collectAsStateWithLifecycle()
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -47,25 +58,76 @@ fun InsightsScreen(navController: NavController) {
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             Spacer(modifier = Modifier.height(8.dp))
-            MotivationalBanner()
-            OverallSummaryCard()
+
+            // Date range filter chips
+            DateRangeFilterRow(
+                selectedRange = selectedRange,
+                onRangeSelected = { viewModel.onRangeSelected(it) }
+            )
+
+            MotivationalBanner(message = viewModel.getStreakMessage(currentStreak))
+
+            OverallSummaryCard(
+                totalChapters = totalLogCount,
+                seriesCount = allSeries.size,
+                topGenre = allSeries
+                    .flatMap { it.genres }
+                    .groupingBy { it.name }
+                    .eachCount()
+                    .maxByOrNull { it.value }
+                    ?.key ?: "—"
+            )
+
             WeeklyActivityChart()
-            GenrePieChart()
+
+            // Monthly activity chart
+            if (monthlyLogCounts.isNotEmpty()) {
+                MonthlyActivityChart(
+                    monthlyCounts = monthlyLogCounts.map {
+                        Pair(viewModel.getMonthLabel(it.month), it.count)
+                    }
+                )
+            }
+
+            GenrePieChart(allSeries)
+
             Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
 
-// (MotivationalBanner, OverallSummaryCard, StatItem, and WeeklyActivityChart are unchanged)
 @Composable
-fun MotivationalBanner() {
+fun DateRangeFilterRow(selectedRange: DateRange, onRangeSelected: (DateRange) -> Unit) {
+    val options = listOf(
+        "This Week" to DateRange.THIS_WEEK,
+        "This Month" to DateRange.THIS_MONTH,
+        "This Year" to DateRange.THIS_YEAR,
+        "All Time" to DateRange.ALL_TIME
+    )
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        options.forEach { (label, range) ->
+            FilterChip(
+                selected = selectedRange == range,
+                onClick = { onRangeSelected(range) },
+                label = { Text(label, style = MaterialTheme.typography.bodySmall) },
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+fun MotivationalBanner(message: String) {
     Card(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = Modifier.fillMaxWidth()
     ) {
         Text(
-            "You've logged reading for 12 days in a row—your dedication is inspiring!",
+            message,
             modifier = Modifier.padding(16.dp),
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.titleMedium,
@@ -76,7 +138,7 @@ fun MotivationalBanner() {
 }
 
 @Composable
-fun OverallSummaryCard() {
+fun OverallSummaryCard(totalChapters: Int, seriesCount: Int, topGenre: String) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -86,9 +148,9 @@ fun OverallSummaryCard() {
             modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            StatItem("Total Chapters", "1,204")
-            StatItem("Series Read", "4")
-            StatItem("Top Genre", "Fantasy")
+            StatItem("Total Logs", totalChapters.toString())
+            StatItem("Series Read", seriesCount.toString())
+            StatItem("Top Genre", topGenre)
         }
     }
 }
@@ -112,7 +174,9 @@ fun StatItem(label: String, value: String) {
 
 @Composable
 fun WeeklyActivityChart() {
-    val dummyWeeklyData = listOf(0.4f, 0.6f, 0.2f, 0.9f, 0.5f, 0.7f, 0.3f) // Represents Sun - Sat
+    val dummyWeeklyData = listOf(0.4f, 0.6f, 0.2f, 0.9f, 0.5f, 0.7f, 0.3f)
+    val dayLabels = listOf("S", "M", "T", "W", "T", "F", "S")
+
     Column {
         Text("Weekly Reading Activity", style = MaterialTheme.typography.titleLarge)
         Spacer(modifier = Modifier.height(16.dp))
@@ -121,46 +185,118 @@ fun WeeklyActivityChart() {
             shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
-            Row(
-                modifier = Modifier.fillMaxSize().padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Bottom
-            ) {
-                dummyWeeklyData.forEach { value ->
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight(fraction = value)
-                            .padding(horizontal = 4.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.8f))
-                    )
+            Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                Row(
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    dummyWeeklyData.forEach { value ->
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(fraction = value)
+                                .padding(horizontal = 4.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.8f))
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    dayLabels.forEach { label ->
+                        Text(
+                            label,
+                            modifier = Modifier.weight(1f),
+                            textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }
     }
 }
 
+@Composable
+fun MonthlyActivityChart(monthlyCounts: List<Pair<String, Int>>) {
+    val maxCount = monthlyCounts.maxOfOrNull { it.second } ?: 1
+
+    Column {
+        Text("Monthly Reading Activity", style = MaterialTheme.typography.titleLarge)
+        Spacer(modifier = Modifier.height(16.dp))
+        Card(
+            modifier = Modifier.fillMaxWidth().height(200.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                Row(
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    monthlyCounts.reversed().forEach { (_, count) ->
+                        val fraction = (count.toFloat() / maxCount).coerceIn(0.05f, 1f)
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(fraction = fraction)
+                                .padding(horizontal = 4.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
+                        ) {
+                            Text(
+                                count.toString(),
+                                modifier = Modifier
+                                    .align(Alignment.TopCenter)
+                                    .padding(top = 2.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    monthlyCounts.reversed().forEach { (label, _) ->
+                        Text(
+                            label,
+                            modifier = Modifier.weight(1f),
+                            textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
-fun GenrePieChart() {
-    val genreCounts = remember {
-
-        val allGenres = DummyData.seriesList.flatMap { it.genres }
-
+fun GenrePieChart(allSeries: List<com.example.codexiabeta.data.entity.SeriesWithGenres>) {
+    val genreCounts = remember(allSeries) {
+        val allGenres = allSeries.flatMap { swg -> swg.genres.map { it.name } }
         allGenres.groupingBy { it }.eachCount()
             .map { (genre, count) -> GenreCount(genre, count) }
             .sortedByDescending { it.count }
     }
-
-    val totalBooks = remember { DummyData.seriesList.size } // Total is still the number of series
 
     val pieChartColors = listOf(
         MaterialTheme.colorScheme.primary,
         MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
         MaterialTheme.colorScheme.secondaryContainer,
         MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-        MaterialTheme.colorScheme.surfaceVariant // Added more colors for more genres
+        MaterialTheme.colorScheme.surfaceVariant
     )
 
     Column {
@@ -179,7 +315,6 @@ fun GenrePieChart() {
                     modifier = Modifier.size(150.dp),
                     genreCounts = genreCounts,
                     colors = pieChartColors,
-                    // The denominator for the sweep angle is the total number of genre instances
                     totalCount = genreCounts.sumOf { it.count }
                 )
                 Spacer(modifier = Modifier.width(24.dp))
@@ -210,32 +345,36 @@ fun AnimatedPieChartCanvas(
         animationPlayed = true
     }
 
+    val seriesCount = genreCounts.sumOf { it.count }
+
     Box(
         modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            var startAngle = -90f
-            genreCounts.forEachIndexed { index, stat ->
-                val sweepAngle = (stat.count.toFloat() / totalCount) * 360f
-                drawArc(
-                    color = colors[index % colors.size],
-                    startAngle = startAngle,
-                    sweepAngle = sweepAngle * animateProgress,
-                    useCenter = false,
-                    style = Stroke(width = 35f, cap = StrokeCap.Butt)
-                )
-                startAngle += sweepAngle
+            if (totalCount > 0) {
+                var startAngle = -90f
+                genreCounts.forEachIndexed { index, stat ->
+                    val sweepAngle = (stat.count.toFloat() / totalCount) * 360f
+                    drawArc(
+                        color = colors[index % colors.size],
+                        startAngle = startAngle,
+                        sweepAngle = sweepAngle * animateProgress,
+                        useCenter = false,
+                        style = Stroke(width = 35f, cap = StrokeCap.Butt)
+                    )
+                    startAngle += sweepAngle
+                }
             }
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = DummyData.seriesList.size.toString(),
+                text = genreCounts.size.toString(),
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Titles",
+                text = "Genres",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

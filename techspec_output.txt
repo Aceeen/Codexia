@@ -1,0 +1,315 @@
+﻿
+
+
+
+CODEXIA
+Technical Specification & Feature Roadmap
+
+Version 2.0  |  Android (Jetpack Compose)  |  Kotlin
+
+
+
+
+
+
+
+
+Arcane Grimoire Design Philosophy
+Offline-First  |  Manual Input  |  Personal & Private
+
+
+Table of Contents
+
+1. Project Overview
+Codexia is an Android reading tracker built with Jetpack Compose and Kotlin. It follows an offline-first architecture, allowing users to manually log, annotate, and visualize their reading journey across web comics and light novels. The app is governed by the "Arcane Grimoire" design language: dark, cozy, and intimate.
+
+1.1 Tech Stack
+
+1.2 Design Tokens
+
+
+2. Current Architecture
+The app currently uses dummy/static data objects in DummyData.kt. The v2.0 plan migrates all state to a Room database with ViewModel + Repository. Below is the screen graph and navigation structure.
+
+2.1 Navigation Graph
+
+2.2 Database Schema (Room)
+The following tables must be implemented to replace DummyData.kt:
+
+
+
+3. Feature Specifications
+Each feature below is mapped to the screen it belongs to, with implementation steps and any relevant Compose or Kotlin patterns.
+
+3.1 Progress Logger (SeriesDetailScreen)
+The ProgressLogger composable currently has empty state and no save logic. This must be fully wired up.
+
+Current State
+OutlinedTextField for Chapter Number has no mutableStateOf ù value is hardcoded as empty string.
+OutlinedTextField for Notes has no mutableStateOf.
+Log Progress button onClick is a no-op TODO.
+
+Required Changes
+Add local state: var chapterInput by remember { mutableStateOf("") }
+Add local state: var notesInput by remember { mutableStateOf("") }
+Wire each field to its state variable.
+On button click: validate chapterInput is a non-empty integer, create a LogEntry, prepend to logHistory, and clear both fields.
+Show a Snackbar confirmation: "Entry logged for Chapter X."
+After Room integration: call a ViewModel function instead of mutating local state.
+
+Validation Rules
+Chapter number must be a positive integer.
+Show inline error text below the field if invalid on submit attempt.
+Notes field is optional ù no validation required.
+
+3.2 Room Database Integration
+All persistent data currently lives in DummyData.kt. This must be replaced with a Room database.
+
+Implementation Steps
+Create AppDatabase.kt extending RoomDatabase, listing all entity classes.
+Create @Entity data classes (Series, Shelf, Genre, SeriesGenreCrossRef, LogEntry) matching the schema in section 2.2.
+Create @Dao interfaces for each entity with standard CRUD plus Flow-returning queries.
+Create Repository classes that wrap Dao calls and expose Flow<List<T>> to ViewModels.
+Create ViewModels (LibraryViewModel, SeriesDetailViewModel, InsightsViewModel) using StateFlow and viewModelScope.
+Wire ViewModels to Composables via viewModel() or hiltViewModel() and collectAsStateWithLifecycle().
+Seed default shelves ("Webcomics", "Light Novels", "Favorites") in a RoomDatabase.Callback on first creation.
+
+Dependency
+implementation("androidx.room:room-runtime:2.6.1")
+implementation("androidx.room:room-ktx:2.6.1")
+kapt("androidx.room:room-compiler:2.6.1")
+implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+
+3.3 Library Search & Shelf Filtering (LibraryScreen)
+The search bar and shelf tabs currently have no filtering logic.
+
+Search
+In LibraryViewModel, expose a MutableStateFlow<String> for searchQuery.
+Derive a filtered series list using combine(allSeries, searchQuery) { series, query -> series.filter { ... } }.
+Match against title (case-insensitive) and author fields.
+Display a "No results found" empty state when the filtered list is empty.
+
+Shelf Tab Filtering
+Expose selectedShelf: MutableStateFlow<String> from ViewModel.
+When "All" is selected, return all series. Otherwise, filter by shelf.name == selectedShelf.
+Shelf list for tabs should come from the Shelves table, not a hardcoded list.
+
+3.4 Expandable Synopsis (SeriesDetailScreen)
+The synopsis in Masthead is truncated to maxLines = 4 with no way to read the full text.
+
+Implementation
+Add var isExpanded by remember { mutableStateOf(false) } inside Masthead.
+Pass maxLines = if (isExpanded) Int.MAX_VALUE else 4 to the synopsis Text.
+Add a TextButton below the synopsis: "Show more" / "Show less" that toggles isExpanded.
+Animate the expand/collapse using animateContentSize() modifier on the Column.
+
+3.5 Chapter Progress Bar (SeriesDetailScreen)
+No visual indication of reading progress exists. A progress bar should be shown in the Masthead.
+
+Data Requirement
+Series entity needs a totalChapters: Int? field (nullable for ongoing series).
+In AddEditSeriesScreen, add a "Total Chapters" OutlinedTextField (numeric, optional).
+
+UI Implementation
+Below the genre tags in Masthead, add a Row with a LinearProgressIndicator.
+progress = (latestChapterLogged.toFloat() / totalChapters).coerceIn(0f, 1f)
+Show a Text label: "Ch. 179 / 551" beside or below the bar.
+If totalChapters is null (ongoing, unknown), hide the progress bar and show "Ongoing" chip.
+
+3.6 Source URL Button (SeriesDetailScreen)
+The sourceUrl field exists in AddEditSeriesScreen but is never displayed on the detail screen.
+
+Implementation
+In Masthead, below the genre tags row, add an OutlinedButton: "Open Source" with an OpenInNew icon.
+Only show the button if series.sourceUrl is not null/blank.
+On click: val intent = Intent(Intent.ACTION_VIEW, Uri.parse(series.sourceUrl)); context.startActivity(intent)
+Retrieve context via LocalContext.current inside the composable.
+
+3.7 Cover Image Picker (AddEditSeriesScreen)
+The "From Gallery" and "Search Online" buttons exist but have no logic.
+
+Gallery Pick
+Register a launcher: val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> coverUri = uri }
+On "From Gallery" click: launcher.launch("image/*")
+Display the selected image using AsyncImage from Coil with a placeholder.
+Save the URI string to the Series.coverPath field in the database.
+
+Online Search
+On "Search Online" click, navigate to a new CoverSearchScreen route, passing the series title as a query parameter.
+CoverSearchScreen shows a search bar pre-filled with the title and a grid of results from an image API (e.g., Google Custom Search JSON API or Bing Image Search).
+Tapping a result downloads the image to internal storage, saves the local path to coverPath, and navigates back.
+Note: API key management must be handled securely via BuildConfig or an environment variable.
+
+3.8 Form Validation (AddEditSeriesScreen)
+The Save button currently performs no validation before calling navController.popBackStack().
+
+Required Validations
+Title: must not be blank. Show error below the field.
+Author: must not be blank. Show error below the field.
+Source URL: if not blank, must be a valid URL format (startsWith("http")).
+Genres: at least one genre must be added.
+
+Implementation
+Add var titleError by remember { mutableStateOf<String?>(null) } (and equivalents for other fields).
+In the Save button onClick, run validations first. Set error state strings on failure and return early.
+Pass isError = titleError != null and supportingText = { titleError?.let { Text(it) } } to the relevant OutlinedTextFields.
+
+3.9 Edit Mode (AddEditSeriesScreen)
+The Edit button in SeriesDetailScreen navigates to a blank AddEditSeriesScreen. It should pre-populate all fields with the series data.
+
+Navigation Change
+Change the route to: navController.navigate("addEditSeries/${series.id}")
+Register in MainActivity NavHost: composable("addEditSeries/{seriesId?}") { ... }
+seriesId is optional ù null means "add new", non-null means "edit existing".
+
+ViewModel
+AddEditSeriesViewModel takes an optional seriesId parameter.
+If seriesId is non-null, load the series from the repository and populate form state fields.
+On Save, call update() if editing, or insert() if creating new.
+
+3.10 Dynamic Greeting (HomeScreen)
+The greeting is hardcoded as "Good Evening, Acin." It should reflect the actual time of day and eventually the actual user name.
+
+Time-Based Greeting
+fun getGreeting(): String {
+    val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+    return when (hour) {
+        in 5..11  -> "Good Morning"
+        in 12..16 -> "Good Afternoon"
+        in 17..20 -> "Good Evening"
+        else      -> "Good Night"
+    }
+}
+
+User name should come from a UserPreferences datastore key (or Room users table). Default to "Reader" if not set.
+Recompute the greeting on each HomeScreen recomposition or via a remembered derivedStateOf.
+
+3.11 "View All" Button Navigation (HomeScreen)
+The "View All" TextButton in ContinueReadingSection calls navController.navigate("library") but this navigates to a new back-stack entry in the main nav graph, not the bottom tab.
+
+Fix
+HomeScreen receives mainNavController (outer) and bottomBarNavController (inner) as separate parameters, or it uses LocalNavController composition local.
+The "View All" button should call bottomBarNavController.navigate(NavigationItem.Library.route) to switch tabs cleanly, not push a new full-screen destination.
+Alternatively, hoist a callback lambda from MainScreen that HomeScreen calls: onNavigateToLibrary: () -> Unit.
+
+
+4. Insights Screen Enhancements
+
+4.1 Reading Streak Tracker
+The MotivationalBanner currently shows a hardcoded string. It must reflect an actual streak computed from the database.
+
+Streak Calculation Logic
+Query all LogEntry timestamps ordered by date descending.
+Group by calendar day (yyyy-MM-dd format).
+Walk backward from today: if today has at least one entry, streak starts at 1. Each consecutive previous day with an entry increments the streak.
+Store currentStreak: Int in InsightsViewModel as a StateFlow derived from the log entries Flow.
+
+UI
+MotivationalBanner should show: "You've read for X days in a row ù keep it up!" or a distinct message at streak milestones (7, 30, 100 days).
+If streak is 0, show: "Start reading today to begin your streak!"
+
+4.2 Monthly Chapter Count Chart
+A monthly chart is needed alongside the existing weekly activity chart.
+
+Data
+Query: SELECT strftime('%Y-%m', timestamp) as month, COUNT(*) as entries FROM log_entries GROUP BY month ORDER BY month DESC LIMIT 6
+Expose as a Flow<List<MonthlyCount>> from the repository.
+
+UI
+Add a MonthlyActivityChart composable below WeeklyActivityChart using the same bar chart pattern.
+X-axis labels: abbreviated month names ("Jan", "Feb", etc.).
+Y-axis: scale bars relative to the maximum count in the dataset.
+
+4.3 Date Range Filter
+The Insights screen should allow filtering stats by a date range.
+
+UI
+Add a FilterChip row below the top bar: "This Week", "This Month", "This Year", "All Time".
+Selected chip is highlighted with primary color.
+Expose selectedRange: MutableStateFlow<DateRange> from InsightsViewModel.
+All queries (streak, charts, total chapters, genre distribution) must filter by the selected range.
+
+
+5. UX & Polish
+
+5.1 Swipe-to-Delete Log History Items
+Log entries currently only support deletion via an explicit button. Swipe-to-delete should be added.
+
+Implementation
+Wrap LogHistoryItem in a SwipeToDismiss composable (androidx.compose.material3).
+Reveal a red delete background with a DeleteForever icon on swipe.
+On dismiss: call onDelete() ù which already includes Snackbar undo logic.
+Threshold: DismissValue.DismissedToStart (left swipe only).
+
+Code Pattern
+val dismissState = rememberSwipeToDismissBoxState()
+SwipeToDismissBox(
+    state = dismissState,
+    backgroundContent = { DeleteBackground() },
+    content = { LogHistoryItem(...) }
+)
+LaunchedEffect(dismissState.currentValue) {
+    if (dismissState.currentValue == SwipeToDismissBoxValue.EndToStart) {
+        onDelete()
+    }
+}
+
+5.2 Sort & Filter for Log History
+The reading log on SeriesDetailScreen has no sorting or filtering controls.
+
+Sort Options
+Newest First (default)
+Oldest First
+Pinned First (already implemented partially)
+By Chapter Number (ascending / descending)
+
+UI
+Add a small dropdown or row of chips above the log history list: "Sort by:"
+selectedSort: MutableStateFlow<SortOrder> in SeriesDetailViewModel drives the derived sorted list.
+
+5.3 Create New Shelf Dialog
+The Shelf dropdown in AddEditSeriesScreen has a "+ Create New Shelf" item that currently does nothing.
+
+Implementation
+Show an AlertDialog when "+ Create New Shelf" is tapped.
+Dialog contains a single OutlinedTextField for the shelf name.
+On confirm: insert a new Shelf into the database, update the dropdown list, and auto-select the new shelf.
+Validate that the shelf name is non-blank and not a duplicate.
+
+
+6. Implementation Priority
+The following order is recommended to minimize rework and unblock dependent features:
+
+
+
+7. Updated app/build.gradle.kts Dependencies
+Add the following to the existing dependencies block in app/build.gradle.kts:
+
+// Room
+implementation("androidx.room:room-runtime:2.6.1")
+implementation("androidx.room:room-ktx:2.6.1")
+kapt("androidx.room:room-compiler:2.6.1")
+
+// ViewModel + Compose integration
+implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
+
+// Coil (image loading for covers)
+implementation("io.coil-kt:coil-compose:2.6.0")
+
+// DataStore (user preferences)
+implementation("androidx.datastore:datastore-preferences:1.0.0")
+
+// Retrofit (cover image online search)
+implementation("com.squareup.retrofit2:retrofit:2.9.0")
+implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+
+// Kotlin Symbol Processing (replaces kapt for newer projects)
+// Note: switch build plugin from kotlin-kapt to KSP if desired
+
+Also apply the Kotlin KAPT plugin at the top of app/build.gradle.kts:
+plugins {
+    id("kotlin-kapt")
+    // ... existing plugins
+}
+
