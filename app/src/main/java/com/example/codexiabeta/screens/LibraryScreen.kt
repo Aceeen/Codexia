@@ -33,6 +33,9 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.codexiabeta.data.entity.SeriesWithGenres
 import com.example.codexiabeta.viewmodel.LibraryViewModel
+import com.example.codexiabeta.viewmodel.SortOption
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 
 private enum class ViewType { LIST, GRID }
 
@@ -45,9 +48,26 @@ fun LibraryScreen(
     val haptics = LocalHapticFeedback.current
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val selectedShelf by viewModel.selectedShelf.collectAsStateWithLifecycle()
+    val selectedSortOption by viewModel.selectedSortOption.collectAsStateWithLifecycle()
+    val selectedGenres by viewModel.selectedGenres.collectAsStateWithLifecycle()
+    val allGenres by viewModel.allGenres.collectAsStateWithLifecycle()
     val shelves by viewModel.shelves.collectAsStateWithLifecycle()
     val filteredSeries by viewModel.filteredSeries.collectAsStateWithLifecycle()
     var viewType by remember { mutableStateOf(ViewType.LIST) }
+
+    val listState = rememberLazyListState()
+    val gridState = rememberLazyGridState()
+
+    val currentIds = remember(filteredSeries) { filteredSeries.map { it.series.id } }
+    var lastIds by remember { mutableStateOf<List<String>>(emptyList()) }
+
+    LaunchedEffect(currentIds, viewType) {
+        if (filteredSeries.isNotEmpty() && currentIds != lastIds) {
+            listState.scrollToItem(0)
+            gridState.scrollToItem(0)
+        }
+        lastIds = currentIds
+    }
 
     // Build tab list: "All" + shelf names
     val tabNames = listOf("All") + shelves.map { it.name }
@@ -133,14 +153,31 @@ fun LibraryScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                IconButton(onClick = {
-                    viewType = if (viewType == ViewType.LIST) ViewType.GRID else ViewType.LIST
-                }) {
-                    Icon(
-                        imageVector = if (viewType == ViewType.LIST) Icons.Default.GridView else Icons.Default.ViewList,
-                        contentDescription = "Toggle View",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    GenreFilterDropdown(
+                        allGenres = allGenres,
+                        selectedGenres = selectedGenres,
+                        onGenreToggled = { viewModel.toggleGenreFilter(it) },
+                        onClearGenres = { viewModel.clearGenreFilter() }
                     )
+
+                    SortDropdown(
+                        selectedSort = selectedSortOption,
+                        onSortSelected = { viewModel.onSortOptionSelected(it) }
+                    )
+
+                    IconButton(onClick = {
+                        viewType = if (viewType == ViewType.LIST) ViewType.GRID else ViewType.LIST
+                    }) {
+                        Icon(
+                            imageVector = if (viewType == ViewType.LIST) Icons.Default.GridView else Icons.Default.ViewList,
+                            contentDescription = "Toggle View",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
 
@@ -207,8 +244,8 @@ fun LibraryScreen(
                 }
             } else {
                 when (viewType) {
-                    ViewType.LIST -> LibraryListView(navController, filteredSeries)
-                    ViewType.GRID -> LibraryGridView(navController, filteredSeries)
+                    ViewType.LIST -> LibraryListView(navController, filteredSeries, listState)
+                    ViewType.GRID -> LibraryGridView(navController, filteredSeries, gridState)
                 }
             }
         }
@@ -216,8 +253,13 @@ fun LibraryScreen(
 }
 
 @Composable
-private fun LibraryListView(navController: NavController, seriesList: List<SeriesWithGenres>) {
+private fun LibraryListView(
+    navController: NavController,
+    seriesList: List<SeriesWithGenres>,
+    state: androidx.compose.foundation.lazy.LazyListState
+) {
     LazyColumn(
+        state = state,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -230,8 +272,13 @@ private fun LibraryListView(navController: NavController, seriesList: List<Serie
 }
 
 @Composable
-private fun LibraryGridView(navController: NavController, seriesList: List<SeriesWithGenres>) {
+private fun LibraryGridView(
+    navController: NavController,
+    seriesList: List<SeriesWithGenres>,
+    state: androidx.compose.foundation.lazy.grid.LazyGridState
+) {
     LazyVerticalGrid(
+        state = state,
         columns = GridCells.Adaptive(minSize = 120.dp),
         contentPadding = PaddingValues(16.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -333,6 +380,150 @@ fun SeriesListItem(series: SeriesWithGenres, onClick: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+        }
+    }
+}
+
+@Composable
+fun SortDropdown(
+    selectedSort: SortOption,
+    onSortSelected: (SortOption) -> Unit
+) {
+    var isExpanded by remember { mutableStateOf(false) }
+
+    Box {
+        TextButton(
+            onClick = { isExpanded = true },
+            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Sort,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = "Sort: ${selectedSort.displayName}",
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium
+            )
+            Icon(
+                imageVector = Icons.Default.ArrowDropDown,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+
+        DropdownMenu(
+            expanded = isExpanded,
+            onDismissRequest = { isExpanded = false },
+            modifier = Modifier.background(MaterialTheme.colorScheme.surface) // DeepBlue surface container
+        ) {
+            SortOption.values().forEach { option ->
+                DropdownMenuItem(
+                    text = { 
+                        Text(
+                            text = option.displayName, 
+                            color = if (option == selectedSort) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                        ) 
+                    },
+                    onClick = {
+                        onSortSelected(option)
+                        isExpanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun GenreFilterDropdown(
+    allGenres: List<String>,
+    selectedGenres: Set<String>,
+    onGenreToggled: (String) -> Unit,
+    onClearGenres: () -> Unit
+) {
+    var isExpanded by remember { mutableStateOf(false) }
+
+    val displayText = remember(selectedGenres) {
+        if (selectedGenres.isEmpty()) {
+            "All Genres"
+        } else {
+            selectedGenres.joinToString(", ")
+        }
+    }
+
+    Box {
+        TextButton(
+            onClick = { isExpanded = true },
+            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
+        ) {
+            Icon(
+                imageVector = Icons.Default.FilterList,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = displayText,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 100.dp)
+            )
+            Icon(
+                imageVector = Icons.Default.ArrowDropDown,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+
+        DropdownMenu(
+            expanded = isExpanded,
+            onDismissRequest = { isExpanded = false },
+            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+        ) {
+            if (allGenres.isEmpty()) {
+                DropdownMenuItem(
+                    text = { Text("No genres found", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                    onClick = { isExpanded = false }
+                )
+            } else {
+                if (selectedGenres.isNotEmpty()) {
+                    DropdownMenuItem(
+                        text = { Text("Clear Filters", color = MaterialTheme.colorScheme.primary) },
+                        onClick = {
+                            onClearGenres()
+                            isExpanded = false
+                        }
+                    )
+                    HorizontalDivider()
+                }
+
+                allGenres.forEach { genre ->
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(
+                                    checked = genre in selectedGenres,
+                                    onCheckedChange = { onGenreToggled(genre) },
+                                    colors = CheckboxDefaults.colors(
+                                        checkedColor = MaterialTheme.colorScheme.primary,
+                                        uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(genre, color = MaterialTheme.colorScheme.onSurface)
+                            }
+                        },
+                        onClick = {
+                            onGenreToggled(genre)
+                        }
+                    )
+                }
             }
         }
     }
