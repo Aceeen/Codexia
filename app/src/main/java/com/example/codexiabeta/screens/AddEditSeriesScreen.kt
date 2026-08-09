@@ -405,18 +405,17 @@ fun GenreTagInput(
         }
     }
 
-    LaunchedEffect(suggestions) {
-        isExpanded = suggestions.isNotEmpty()
-    }
-
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         ExposedDropdownMenuBox(
-            expanded = isExpanded,
+            expanded = isExpanded && suggestions.isNotEmpty(),
             onExpandedChange = { }
         ) {
             OutlinedTextField(
                 value = text,
-                onValueChange = { text = it },
+                onValueChange = { 
+                    text = it
+                    isExpanded = it.isNotBlank()
+                },
                 label = { Text("Add a genre tag") },
                 modifier = Modifier.fillMaxWidth().menuAnchor(),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
@@ -440,7 +439,7 @@ fun GenreTagInput(
                 }
             )
 
-            if (suggestions.isNotEmpty()) {
+            if (isExpanded && suggestions.isNotEmpty()) {
                 ExposedDropdownMenu(
                     expanded = isExpanded,
                     onDismissRequest = { isExpanded = false },
